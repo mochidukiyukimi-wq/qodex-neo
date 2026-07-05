@@ -86,12 +86,22 @@ app.get("/api/me", async (req, res) => {
   res.json({ loggedIn: true, user: session.user || (await traqFetch(session, "/users/me")) });
 });
 
+app.get("/api/channels", authed(async (req, res, session) => {
+  res.json({ channels: (await getChannels(session)).filter(c => !c.archived).slice(0, 120) });
+}));
+
 app.post("/api/resolve-channel", authed(async (req, res, session) => {
   const input = String(req.body.input || "").trim();
   const channels = await getChannels(session);
   const channel = resolveChannel(channels, input);
   if (!channel) return res.status(404).json({ error: "channel not found" });
   res.json({ channel });
+}));
+
+app.post("/api/messages", authed(async (req, res, session) => {
+  const channelId = String(req.body.channelId || "");
+  if (!channelId) return res.status(400).json({ error: "channelId is required" });
+  res.json({ messages: await getMessages(session, channelId) });
 }));
 
 app.post("/api/review", authed(async (req, res, session) => {
