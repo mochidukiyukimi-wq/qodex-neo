@@ -19,6 +19,7 @@ const traq = {
   redirectUrl: process.env.TRAQ_REDIRECT_URL || `${baseUrl}/oauth/callback`,
   allowedUser: process.env.ALLOWED_TRAQ_USER || "",
   allowedUserId: process.env.ALLOWED_TRAQ_USER_ID || "",
+  allowedPostChannelPath: process.env.ALLOWED_POST_CHANNEL_PATH || "",
 };
 
 const ai = {
@@ -148,8 +149,23 @@ app.post("/api/post", authed(async (req, res, session) => {
   res.json({ message: await postMessage(session, channelId, content) });
 }));
 
+app.get("/qodex-auth.js", (req, res) => {
+  res.type("application/javascript").send(`
+(() => {
+  const go = () => {
+    if (location.hostname === "qodex.trap.show" && location.pathname === "/login") {
+      location.replace("/login?oauth=1");
+    }
+  };
+  go();
+  setInterval(go, 1000);
+})();
+`);
+});
+
 app.all("/api/v3/channels/:channelId/messages", authed(async (req, res, session) => {
   if (req.method !== "POST") return proxyTraqApi(req, res, session);
+  await assertAllowedPostChannel(session, req.params.channelId);
 
   const content = String(req.body.content || "").trim();
   if (!content) return res.status(400).json({ message: "content is required" });
@@ -294,7 +310,12 @@ async function proxyTraqFrontend(req, res) {
   const upstream = await fetch(`${traq.origin}${req.originalUrl}`, {
     headers: { accept: req.headers.accept || "*/*" },
   });
-  await pipeFetchResponse(upstream, res);
+  const type = upstream.headers.get("content-type") || "";
+  if (!type.includes("text/html")) return pipeFetchResponse(upstream, res);
+
+  res.status(upstream.status).type("html").send(
+    (await upstream.text()).replace("</head>", `<script src="/qodex-auth.js"></script></head>`)
+  );
 }
 
 async function pipeFetchResponse(upstream, res) {
@@ -364,6 +385,16 @@ function resolveChannel(channels, input) {
   const urlMatch = input.match(/q\.trap\.jp\/channels\/([^?#]+)/);
   const value = decodeURIComponent(urlMatch ? urlMatch[1] : input).replace(/^#/, "").replace(/^\/+/, "");
   return channels.find(c => c.id === value) || channels.find(c => c.path === value) || channels.find(c => c.path.endsWith(`/${value}`));
+}
+
+async function assertAllowedPostChannel(session, channelId) {
+  const allowedPath = traq.allowedPostChannelPath || (traq.allowedUser ? `times/26/${traq.allowedUser}` : "");
+  if (!allowedPath) return;
+  const channel = (await getChannels(session)).find(c => c.id === channelId);
+  if (channel?.path === allowedPath) return;
+  const err = new Error(`QodeX only posts to #${allowedPath}`);
+  err.status = 403;
+  throw err;
 }
 
 async function getMessages(session, channelId) {
