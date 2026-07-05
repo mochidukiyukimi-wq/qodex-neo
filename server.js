@@ -7,7 +7,7 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
 const sessionSecret = mustEnv("SESSION_SECRET");
-const dataPath = path.join(process.cwd(), "data", "sessions.json");
+const dataPath = process.env.SESSION_FILE || "/tmp/qodex-sessions.json";
 
 const traq = {
   api: "https://q.trap.jp/api/v3",
