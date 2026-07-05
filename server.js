@@ -10,6 +10,7 @@ const sessionSecret = mustEnv("SESSION_SECRET");
 const dataPath = process.env.SESSION_FILE || "/tmp/qodex-sessions.json";
 
 const traq = {
+  origin: "https://q.trap.jp",
   api: "https://q.trap.jp/api/v3",
   auth: "https://q.trap.jp/api/v3/oauth2/authorize",
   token: "https://q.trap.jp/api/v3/oauth2/token",
@@ -26,7 +27,6 @@ const ai = {
 };
 
 app.use(express.json({ limit: "1mb" }));
-app.use(express.static("public"));
 
 app.get("/login", async (req, res) => {
   const session = await getSession(req, res);
@@ -148,6 +148,32 @@ app.post("/api/post", authed(async (req, res, session) => {
   res.json({ message: await postMessage(session, channelId, content) });
 }));
 
+app.all("/api/v3/channels/:channelId/messages", authed(async (req, res, session) => {
+  if (req.method !== "POST") return proxyTraqApi(req, res, session);
+
+  const content = String(req.body.content || "").trim();
+  if (!content) return res.status(400).json({ message: "content is required" });
+
+  const context = await getMessages(session, req.params.channelId);
+  const review = await aiFetch("/review", { draft: content, context });
+  if (review.action !== "pass") {
+    return res.status(400).json({
+      message: `QodeX warning: ${review.warning || "AI review stopped this post."}`,
+      warning: review.warning || "",
+    });
+  }
+  return proxyTraqApi(req, res, session);
+}));
+
+app.all("/api/v3/*", authed(proxyTraqApi));
+
+app.get("*", async (req, res) => {
+  const session = await getSession(req, res);
+  const wantsHtml = String(req.headers.accept || "").includes("text/html");
+  if (wantsHtml && !session.token) return res.redirect("/login");
+  return proxyTraqFrontend(req, res);
+});
+
 app.listen(port, () => {
   console.log(`QodeX listening on ${baseUrl}`);
 });
@@ -249,6 +275,35 @@ async function traqFetch(session, apiPath, options = {}) {
   });
   if (!res.ok) throw new Error(`traQ API error ${res.status}: ${await res.text()}`);
   return res.status === 204 ? null : res.json();
+}
+
+async function proxyTraqApi(req, res, session) {
+  const accessToken = await ensureToken(session);
+  const upstream = await fetch(`${traq.origin}${req.originalUrl}`, {
+    method: req.method,
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": req.headers["content-type"] || "application/json",
+    },
+    body: ["GET", "HEAD"].includes(req.method) ? undefined : JSON.stringify(req.body ?? {}),
+  });
+  await pipeFetchResponse(upstream, res);
+}
+
+async function proxyTraqFrontend(req, res) {
+  const upstream = await fetch(`${traq.origin}${req.originalUrl}`, {
+    headers: { accept: req.headers.accept || "*/*" },
+  });
+  await pipeFetchResponse(upstream, res);
+}
+
+async function pipeFetchResponse(upstream, res) {
+  res.status(upstream.status);
+  for (const key of ["content-type", "cache-control", "etag", "last-modified"]) {
+    const value = upstream.headers.get(key);
+    if (value) res.setHeader(key, value);
+  }
+  res.send(Buffer.from(await upstream.arrayBuffer()));
 }
 
 function authed(handler) {
