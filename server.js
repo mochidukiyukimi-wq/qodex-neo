@@ -152,6 +152,7 @@ app.post("/api/post", authed(async (req, res, session) => {
 app.get("/qodex-auth.js", (req, res) => {
   res.type("application/javascript").send(`
 (() => {
+  navigator.serviceWorker?.getRegistrations?.().then(rs => rs.forEach(r => r.unregister()));
   const go = () => {
     if (location.hostname === "qodex.trap.show" && location.pathname === "/login") {
       location.replace("/login?oauth=1");
@@ -161,6 +162,10 @@ app.get("/qodex-auth.js", (req, res) => {
   setInterval(go, 1000);
 })();
 `);
+});
+
+app.get(["/sw.js", "/service-worker.js"], (req, res) => {
+  res.type("application/javascript").set("cache-control", "no-store").send("");
 });
 
 app.all("/api/v3/channels/:channelId/messages", authed(async (req, res, session) => {
@@ -313,7 +318,7 @@ async function proxyTraqFrontend(req, res) {
   const type = upstream.headers.get("content-type") || "";
   if (!type.includes("text/html")) return pipeFetchResponse(upstream, res);
 
-  res.status(upstream.status).type("html").send(
+  res.status(upstream.status).type("html").set("cache-control", "no-store").send(
     (await upstream.text()).replace("</head>", `<script src="/qodex-auth.js"></script></head>`)
   );
 }
