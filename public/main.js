@@ -50,15 +50,19 @@ createApp({
       }
     },
     async init() {
-      const me = await this.api("/api/me");
-      if (!me.loggedIn) {
-        this.log = "Login required";
-        return;
+      try {
+        const me = await this.api("/api/me");
+        if (!me.loggedIn) {
+          this.log = "Login required";
+          return;
+        }
+        this.me = me.user;
+        this.log = "";
+        const { channels } = await this.api("/api/channels");
+        this.channels = channels;
+      } catch (err) {
+        this.log = err.message === "forbidden" ? "This QodeX is private" : err.message;
       }
-      this.me = me.user;
-      this.log = "";
-      const { channels } = await this.api("/api/channels");
-      this.channels = channels;
     },
     login() {
       location.href = "/login";
@@ -195,14 +199,14 @@ createApp({
             </article>
           </div>
 
-          <section v-if="warning" class="qodex-warning">
+          <section v-if="warning" class="qodex-panel qodex-warning">
             <strong>AI warning</strong>
             <p>{{ warning }}</p>
             <textarea ref="intent" v-model="intent" rows="3" placeholder="どう直すか、送らないか、追加で聞きたいことを書く"></textarea>
             <button @click="rewrite" :disabled="busy">AI に最終文を作らせる</button>
           </section>
 
-          <section v-if="finalPost" class="qodex-final">
+          <section v-if="finalPost" class="qodex-panel qodex-final">
             <strong>AI drafted final post</strong>
             <textarea v-model="finalPost" rows="4" readonly></textarea>
             <div class="final-actions">
@@ -212,10 +216,28 @@ createApp({
           </section>
 
           <form class="message-input" @submit.prevent="review">
-            <textarea v-model="draft" rows="3" :placeholder="channel ? 'メッセージを入力' : '先にチャンネルを選択'"></textarea>
-            <div class="input-tools">
-              <span>{{ log }}</span>
-              <button :disabled="busy || !channel">Review & Post</button>
+            <div class="input-container">
+              <div class="left-controls" aria-hidden="true">
+                <button type="button" class="input-icon" tabindex="-1" title="Upload">
+                  <svg viewBox="0 0 24 24"><path d="M12 3l5 5h-3v7h-4V8H7l5-5zM5 19h14v2H5v-2z"/></svg>
+                </button>
+                <button type="button" class="input-icon" tabindex="-1" title="Preview">
+                  <svg viewBox="0 0 24 24"><path d="M12 5c5 0 9 5 9 7s-4 7-9 7-9-5-9-7 4-7 9-7zm0 2c-3.9 0-6.9 3.4-7 5 .1 1.6 3.1 5 7 5s6.9-3.4 7-5c-.1-1.6-3.1-5-7-5zm0 2.5A2.5 2.5 0 1 1 12 14a2.5 2.5 0 0 1 0-5z"/></svg>
+                </button>
+              </div>
+              <div class="textarea-container">
+                <textarea class="message-textarea" v-model="draft" rows="2" :placeholder="channel ? 'メッセージを入力' : '先にチャンネルを選択'"></textarea>
+                <div class="textarea-over"></div>
+              </div>
+              <div class="right-controls">
+                <span class="input-log">{{ log }}</span>
+                <button type="button" class="input-icon" tabindex="-1" title="Stamp" aria-label="Stamp">
+                  <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM8 9.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm8 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm-4 8.1c-2.4 0-4.4-1.3-5.5-3.3h11c-1.1 2-3.1 3.3-5.5 3.3z"/></svg>
+                </button>
+                <button type="submit" class="send-button" :disabled="busy || !channel || !draft.trim()" title="Review & Post" aria-label="Review and post">
+                  <svg viewBox="0 0 24 24"><path d="M3 20.5 21 12 3 3.5V10l11 2-11 2v6.5z"/></svg>
+                </button>
+              </div>
             </div>
           </form>
         </section>

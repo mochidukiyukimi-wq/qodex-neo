@@ -1,16 +1,27 @@
 :root {
+  --theme-accent-primary-default: #005bac;
+  --theme-accent-primary-background: #e5eef6;
+  --theme-accent-notification-default: #f2994a;
+  --theme-accent-error-default: #f26451;
+  --theme-accent-focus-default: #005bacc0;
   --theme-background-primary-default: #ffffff;
-  --theme-background-primary-border: #d8dee6;
-  --theme-background-secondary-default: #f4f6f8;
-  --theme-background-secondary-border: #dfe5ec;
-  --theme-background-tertiary-default: #edf1f5;
-  --theme-accent-primary-default: #2f80ed;
-  --theme-accent-primary-background: #e8f2ff;
-  --theme-ui-primary-default: #1f2a37;
-  --theme-ui-secondary-default: #657385;
-  --theme-text-primary-default: #1f2a37;
-  --theme-text-secondary-default: #6b7788;
+  --theme-background-primary-border: #c9d6e0;
+  --theme-background-secondary-default: #f0f2f5;
+  --theme-background-secondary-border: #d9e2e8;
+  --theme-background-tertiary-default: #e2e5e9;
+  --theme-background-tertiary-border: #bacad6;
+  --theme-ui-primary-default: #49535b;
+  --theme-ui-primary-background: #ebedef;
+  --theme-ui-secondary-default: #6b7d8a;
+  --theme-ui-secondary-background: #f0f2f4;
+  --theme-ui-secondary-inactive: #ced6db;
+  --theme-ui-tertiary-default: #ced6db;
+  --theme-text-primary-default: #333333;
+  --theme-text-secondary-default: #79797a;
   --specific-main-view-background: #ffffff;
+  --specific-side-bar-background: #1e262e;
+  --specific-message-hover-background: #f7f9fb;
+  --specific-message-input-height: 86px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
@@ -24,7 +35,9 @@ body {
   color: var(--theme-text-primary-default);
 }
 
-button, input, textarea {
+button,
+input,
+textarea {
   font: inherit;
 }
 
@@ -32,11 +45,19 @@ button {
   cursor: pointer;
 }
 
+svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
 .traq {
   display: grid;
   grid-template-columns: 64px 280px 1fr;
   height: 100vh;
   min-width: 0;
+  overflow: hidden;
 }
 
 .global-nav {
@@ -45,8 +66,8 @@ button {
   align-items: center;
   gap: 12px;
   padding: 12px 8px;
-  background: #24303c;
-  color: white;
+  background: var(--specific-side-bar-background);
+  color: #ffffff;
 }
 
 .service-icon {
@@ -54,17 +75,17 @@ button {
   width: 40px;
   height: 40px;
   place-items: center;
-  border-radius: 12px;
-  background: var(--theme-accent-primary-default);
+  border-radius: 10px;
+  background: #00aca2;
   font-weight: 800;
 }
 
 .global-nav button {
   width: 48px;
   border: 0;
-  border-radius: 6px;
-  background: #3a4754;
-  color: white;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
   padding: 7px 0;
   font-size: 11px;
 }
@@ -91,27 +112,28 @@ button {
 }
 
 .channel-search input,
-.message-input textarea,
-.qodex-warning textarea,
-.qodex-final textarea {
+.qodex-panel textarea {
   border: 1px solid var(--theme-background-primary-border);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--theme-background-primary-default);
   color: var(--theme-text-primary-default);
-  padding: 9px 10px;
+  padding: 8px 10px;
   outline: none;
 }
 
+.channel-search input:focus,
+.qodex-panel textarea:focus {
+  border-color: var(--theme-accent-focus-default);
+}
+
 .channel-search button,
-.message-input button,
-.qodex-warning button,
-.qodex-final button {
+.qodex-panel button {
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--theme-accent-primary-default);
-  color: white;
+  color: #ffffff;
   font-weight: 700;
-  padding: 9px 12px;
+  padding: 8px 12px;
 }
 
 .channel-row {
@@ -120,7 +142,7 @@ button {
   gap: 6px;
   align-items: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
   color: var(--theme-ui-primary-default);
   padding: 7px 8px;
@@ -155,18 +177,20 @@ button {
   background: var(--theme-background-primary-default);
 }
 
-h1, p {
+h1,
+p {
   margin: 0;
 }
 
 h1 {
   font-size: 18px;
   font-weight: 700;
+  letter-spacing: 0;
 }
 
 .channel-header p,
 .meta time,
-.input-tools span {
+.input-log {
   color: var(--theme-text-secondary-default);
   font-size: 12px;
 }
@@ -175,18 +199,26 @@ h1 {
   display: grid;
   grid-template-rows: 1fr auto auto auto;
   min-height: 0;
+  background: var(--specific-main-view-background);
 }
 
 .messages {
   overflow: auto;
-  padding: 18px 22px 96px;
+  padding: 16px 0 calc(var(--specific-message-input-height) + 28px);
 }
 
 .message {
+  position: relative;
   display: grid;
   grid-template-columns: 40px 1fr;
   gap: 10px;
-  padding: 6px 0;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 32px;
+}
+
+.message:hover {
+  background: var(--specific-message-hover-background);
 }
 
 .avatar {
@@ -217,47 +249,24 @@ h1 {
   line-height: 1.55;
 }
 
-.message-input,
-.qodex-warning,
-.qodex-final {
-  margin: 0 18px 14px;
-  border: 1px solid var(--theme-background-primary-border);
-  border-radius: 8px;
-  background: var(--theme-background-primary-default);
-  padding: 10px;
+.qodex-panel {
+  display: grid;
+  gap: 8px;
+  margin: 0 32px 12px;
+  border: 1px solid var(--theme-background-secondary-border);
+  border-radius: 4px;
+  background: var(--theme-background-secondary-default);
+  padding: 10px 12px;
 }
 
-.message-input textarea,
-.qodex-warning textarea,
-.qodex-final textarea {
+.qodex-panel textarea {
   width: 100%;
   resize: vertical;
 }
 
-.message-input textarea {
-  min-height: 68px;
-  border: 0;
-  padding: 4px;
-}
-
-.input-tools,
-.final-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: center;
-  margin-top: 8px;
-}
-
-.qodex-warning,
-.qodex-final {
-  display: grid;
-  gap: 8px;
-}
-
 .qodex-warning {
-  border-color: #e6b86e;
-  background: #fff9ec;
+  border-color: rgba(242, 153, 74, 0.45);
+  background: #fff7ec;
 }
 
 .qodex-warning p {
@@ -265,12 +274,122 @@ h1 {
 }
 
 .qodex-final textarea {
-  background: var(--theme-background-secondary-default);
+  background: var(--theme-background-primary-default);
+}
+
+.final-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
 }
 
 .secondary {
-  background: var(--theme-background-tertiary-default) !important;
+  background: var(--theme-ui-secondary-background) !important;
   color: var(--theme-ui-primary-default) !important;
+}
+
+.message-input {
+  position: relative;
+  z-index: 5;
+  margin: 0 32px 20px;
+  border-radius: 4px;
+  transform: translateY(-4px);
+  background: var(--theme-background-secondary-default);
+  padding: 0.5rem 1rem;
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.left-controls {
+  display: flex;
+  gap: 4px;
+  margin: 2px 8px 8px 0;
+  color: var(--theme-ui-secondary-default);
+}
+
+.right-controls {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--theme-ui-secondary-default);
+}
+
+.textarea-container {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: solid 2px transparent;
+  border-radius: 8px;
+}
+
+.textarea-container:focus-within {
+  border-color: var(--theme-accent-focus-default);
+}
+
+.message-textarea {
+  width: 100%;
+  max-height: 320px;
+  min-height: 44px;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: var(--theme-background-primary-default);
+  color: var(--theme-text-primary-default);
+  padding: 8px 88px 8px 16px;
+  line-height: 1.5;
+}
+
+.textarea-over {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  pointer-events: none;
+  background: var(--theme-background-primary-default);
+}
+
+.input-icon,
+.send-button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.input-icon {
+  color: var(--theme-ui-secondary-default);
+}
+
+.send-button {
+  margin: 0 8px;
+  color: var(--theme-accent-primary-default);
+  transition: transform 0.1s;
+}
+
+.send-button:hover {
+  transform: scale(1.1);
+}
+
+.send-button:disabled {
+  color: var(--theme-ui-secondary-inactive);
 }
 
 .empty {
@@ -280,7 +399,7 @@ h1 {
 
 button:disabled {
   cursor: default;
-  opacity: .55;
+  opacity: 0.55;
 }
 
 @media (max-width: 780px) {
@@ -296,5 +415,15 @@ button:disabled {
   .channel-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .message {
+    padding: 8px 16px;
+  }
+
+  .message-input,
+  .qodex-panel {
+    margin-right: 16px;
+    margin-left: 16px;
   }
 }

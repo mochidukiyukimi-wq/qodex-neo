@@ -17,6 +17,7 @@ const traq = {
   clientSecret: mustEnv("TRAQ_CLIENT_SECRET"),
   redirectUrl: process.env.TRAQ_REDIRECT_URL || `${baseUrl}/oauth/callback`,
   allowedUser: process.env.ALLOWED_TRAQ_USER || "",
+  allowedUserId: process.env.ALLOWED_TRAQ_USER_ID || "",
 };
 
 const ai = {
@@ -62,10 +63,11 @@ app.get("/oauth/callback", async (req, res) => {
   delete session.codeVerifier;
 
   const me = await traqFetch(session, "/users/me");
-  if (traq.allowedUser && me.name !== traq.allowedUser) {
+  if (!isAllowedUser(me)) {
     delete session.token;
+    delete session.user;
     await saveSession(session);
-    return res.status(403).send(`Only @${traq.allowedUser} can use this QodeX.`);
+    return res.status(403).send(`Only the configured traQ user can use this QodeX.`);
   }
   session.user = { id: me.id, name: me.name, displayName: me.displayName };
   await saveSession(session);
@@ -81,9 +83,15 @@ app.post("/logout", async (req, res) => {
 });
 
 app.get("/api/me", async (req, res) => {
-  const session = await getSession(req, res);
-  if (!session.token) return res.json({ loggedIn: false });
-  res.json({ loggedIn: true, user: session.user || (await traqFetch(session, "/users/me")) });
+  try {
+    const session = await getSession(req, res);
+    if (!session.token) return res.json({ loggedIn: false });
+    const user = await ensureAllowed(session);
+    res.json({ loggedIn: true, user });
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ error: err.message });
+  }
 });
 
 app.get("/api/channels", authed(async (req, res, session) => {
@@ -248,12 +256,34 @@ function authed(handler) {
     try {
       const session = await getSession(req, res);
       if (!session.token) return res.status(401).json({ error: "login required" });
+      await ensureAllowed(session);
       await handler(req, res, session);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: err.message });
+      res.status(err.status || 500).json({ error: err.message });
     }
   };
+}
+
+async function ensureAllowed(session) {
+  const me = session.user || (await traqFetch(session, "/users/me"));
+  if (!isAllowedUser(me)) {
+    delete session.token;
+    delete session.user;
+    await saveSession(session);
+    const err = new Error("forbidden");
+    err.status = 403;
+    throw err;
+  }
+  session.user = { id: me.id, name: me.name, displayName: me.displayName };
+  await saveSession(session);
+  return session.user;
+}
+
+function isAllowedUser(user) {
+  if (!traq.allowedUser && !traq.allowedUserId) return true;
+  return (!traq.allowedUser || user.name === traq.allowedUser)
+    && (!traq.allowedUserId || user.id === traq.allowedUserId);
 }
 
 async function getChannels(session) {
