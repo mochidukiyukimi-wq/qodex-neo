@@ -393,7 +393,7 @@ function resolveChannel(channels, input) {
 }
 
 async function assertAllowedPostChannel(session, channelId) {
-  const allowedPath = traq.allowedPostChannelPath || (traq.allowedUser ? `times/26/${traq.allowedUser}` : "");
+  const allowedPath = traq.allowedPostChannelPath;
   if (!allowedPath) return;
   const channel = (await getChannels(session)).find(c => c.id === channelId);
   if (channel?.path === allowedPath) return;
