@@ -1,0 +1,103 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  background: Canvas;
+  color: CanvasText;
+}
+
+main {
+  width: min(840px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+h1, h2, p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 28px;
+}
+
+h2 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 10px;
+  font-weight: 700;
+}
+
+input, textarea, button {
+  font: inherit;
+  border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas);
+  border-radius: 8px;
+}
+
+input, textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  background: Canvas;
+  color: CanvasText;
+}
+
+textarea[readonly] {
+  background: color-mix(in srgb, CanvasText 6%, Canvas);
+}
+
+button {
+  padding: 10px 14px;
+  font-weight: 700;
+  background: #1f7a4d;
+  color: white;
+  border-color: #1f7a4d;
+}
+
+button:disabled {
+  opacity: .55;
+}
+
+#stopBox, #finalBox {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid color-mix(in srgb, CanvasText 18%, Canvas);
+}
+
+#warning {
+  white-space: pre-wrap;
+  padding: 12px;
+  border-left: 4px solid #c47f17;
+  background: color-mix(in srgb, #c47f17 12%, Canvas);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+#log, #channelStatus, #me {
+  color: color-mix(in srgb, CanvasText 70%, Canvas);
+}
+
+#log {
+  white-space: pre-wrap;
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QodeX</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>QodeX</h1>
+          <p id="me">checking...</p>
+        </div>
+        <button id="login" hidden>traQ Login</button>
+        <button id="logout" hidden>Logout</button>
+      </header>
+
+      <section id="app" hidden>
+        <label>
+          Channel URL or path
+          <input id="channel" placeholder="https://q.trap.jp/channels/times/23/Nek0yanag1">
+        </label>
+        <button id="resolve">Set Channel</button>
+        <p id="channelStatus"></p>
+
+        <label>
+          Draft
+          <textarea id="draft" rows="7" placeholder="最初に普通に書く"></textarea>
+        </label>
+        <button id="review">Review & Post</button>
+
+        <section id="stopBox" hidden>
+          <h2>QodeX stopped this</h2>
+          <p id="warning"></p>
+          <label>
+            What should QodeX do?
+            <textarea id="intent" rows="4" placeholder="その方針で、もう少し短く / 質問形にして / 送らない など"></textarea>
+          </label>
+          <button id="rewrite">Draft final post</button>
+        </section>
+
+        <section id="finalBox" hidden>
+          <h2>Final post</h2>
+          <textarea id="finalPost" rows="7" readonly></textarea>
+          <div class="row">
+            <button id="post">Post</button>
+            <button id="again">Discuss more</button>
+          </div>
+        </section>
+
+        <pre id="log"></pre>
+      </section>
+    </main>
+    <script src="/main.js"></script>
+  </body>
+</html>
