@@ -2,8 +2,10 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import express from "express";
+import { WebSocket, WebSocketServer } from "ws";
 
 const app = express();
+const wss = new WebSocketServer({ noServer: true });
 const port = Number(process.env.PORT || 3000);
 const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
 const sessionSecret = mustEnv("SESSION_SECRET");
@@ -153,6 +155,55 @@ app.get("/qodex-auth.js", (req, res) => {
   res.type("application/javascript").send(`
 (() => {
   navigator.serviceWorker?.getRegistrations?.().then(rs => rs.forEach(r => r.unregister()));
+  const originalOpen = XMLHttpRequest.prototype.open;
+  const originalSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function(method, url, ...args) {
+    this.__qodexMethod = String(method || "").toUpperCase();
+    this.__qodexUrl = String(url || "");
+    return originalOpen.call(this, method, url, ...args);
+  };
+  XMLHttpRequest.prototype.send = function(body) {
+    this.__qodexBody = body;
+    this.addEventListener("load", async () => {
+      if (window.__qodexHandlingWarning) return;
+      if (this.__qodexMethod !== "POST" || !/\\/api\\/v3\\/channels\\/[^/]+\\/messages/.test(this.__qodexUrl)) return;
+      let data;
+      try { data = JSON.parse(this.responseText || "{}"); } catch { return; }
+      if (!data.qodexWarning) return;
+      const channelId = (this.__qodexUrl.match(/\\/api\\/v3\\/channels\\/([^/]+)\\/messages/) || [])[1];
+      if (!channelId) return;
+      let originalDraft = "";
+      try { originalDraft = JSON.parse(this.__qodexBody || "{}").content || ""; } catch {}
+      window.__qodexHandlingWarning = true;
+      try {
+        const intent = window.prompt(
+          "QodeX warning:\\n" + (data.warning || data.message || "AI review stopped this post.") +
+          "\\n\\nどう直すか、またはどういう意図で投稿したいかを書いてください。空ならキャンセルします。"
+        );
+        if (!intent) return;
+        const rewrite = await fetch("/api/rewrite", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ channelId, originalDraft, warning: data.warning || data.message || "", userIntent: intent })
+        });
+        if (!rewrite.ok) throw new Error(await rewrite.text());
+        const { post } = await rewrite.json();
+        if (!post) return window.alert("QodeX could not draft a replacement.");
+        if (!window.confirm("QodeX draft:\\n\\n" + post + "\\n\\nこの内容で投稿しますか？")) return;
+        const posted = await fetch("/api/post", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ channelId, content: post })
+        });
+        if (!posted.ok) throw new Error(await posted.text());
+      } catch (err) {
+        window.alert("QodeX error: " + (err?.message || err));
+      } finally {
+        window.__qodexHandlingWarning = false;
+      }
+    });
+    return originalSend.call(this, body);
+  };
   const go = () => {
     if (location.hostname === "qodex.trap.show" && location.pathname === "/login") {
       location.replace("/login?oauth=1");
@@ -178,8 +229,9 @@ app.all("/api/v3/channels/:channelId/messages", authed(async (req, res, session)
   const context = await getMessages(session, req.params.channelId);
   const review = await aiFetch("/review", { draft: content, context });
   if (review.action !== "pass") {
-    return res.status(400).json({
-      message: `QodeX warning: ${review.warning || "AI review stopped this post."}`,
+    return res.status(409).json({
+      qodexWarning: true,
+      message: "QodeX warning",
       warning: review.warning || "",
     });
   }
@@ -195,8 +247,42 @@ app.get("*", async (req, res) => {
   return proxyTraqFrontend(req, res);
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`QodeX listening on ${baseUrl}`);
+});
+
+server.on("upgrade", async (req, socket, head) => {
+  try {
+    const pathname = new URL(req.url || "/", baseUrl).pathname;
+    if (pathname !== "/api/v3/ws") return socket.destroy();
+    const session = await getExistingSession(req);
+    if (!session?.token) return rejectUpgrade(socket, 401);
+    await ensureAllowed(session);
+    const accessToken = await ensureToken(session);
+    const upstream = new WebSocket("wss://q.trap.jp/api/v3/ws", {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    const rejectOnConnectError = () => rejectUpgrade(socket, 502);
+    upstream.once("error", rejectOnConnectError);
+    upstream.once("open", () => {
+      upstream.off("error", rejectOnConnectError);
+      wss.handleUpgrade(req, socket, head, client => {
+        upstream.on("message", data => client.readyState === WebSocket.OPEN && client.send(data));
+        client.on("message", data => upstream.readyState === WebSocket.OPEN && upstream.send(data));
+        const closeBoth = () => {
+          if (client.readyState === WebSocket.OPEN) client.close();
+          if (upstream.readyState === WebSocket.OPEN) upstream.close();
+        };
+        client.on("close", closeBoth);
+        upstream.on("close", closeBoth);
+        upstream.on("error", closeBoth);
+        wss.emit("connection", client, req);
+      });
+    });
+  } catch (err) {
+    console.error(err);
+    rejectUpgrade(socket, err.status || 500);
+  }
 });
 
 function mustEnv(name) {
@@ -218,10 +304,7 @@ function sign(value) {
 }
 
 async function getSession(req, res) {
-  const cookies = Object.fromEntries((req.headers.cookie || "").split(";").filter(Boolean).map(c => {
-    const [k, ...v] = c.trim().split("=");
-    return [k, decodeURIComponent(v.join("="))];
-  }));
+  const cookies = parseCookies(req);
   let sid = cookies.qodex_sid?.split(".")[0];
   const sig = cookies.qodex_sid?.split(".")[1];
   if (!sid || sig !== sign(sid)) sid = random();
@@ -230,6 +313,25 @@ async function getSession(req, res) {
   const session = sessions[sid] || { id: sid };
   res.cookie("qodex_sid", `${sid}.${sign(sid)}`, { httpOnly: true, sameSite: "lax", secure: baseUrl.startsWith("https://"), maxAge: 30 * 24 * 3600 * 1000 });
   return session;
+}
+
+async function getExistingSession(req) {
+  const cookies = parseCookies(req);
+  const [sid, sig] = String(cookies.qodex_sid || "").split(".");
+  if (!sid || sig !== sign(sid)) return null;
+  return (await readSessions())[sid] || null;
+}
+
+function parseCookies(req) {
+  return Object.fromEntries((req.headers.cookie || "").split(";").filter(Boolean).map(c => {
+    const [k, ...v] = c.trim().split("=");
+    return [k, decodeURIComponent(v.join("="))];
+  }));
+}
+
+function rejectUpgrade(socket, status) {
+  if (!socket.destroyed) socket.write(`HTTP/1.1 ${status} WebSocket rejected\\r\\nConnection: close\\r\\n\\r\\n`);
+  socket.destroy();
 }
 
 async function readSessions() {
