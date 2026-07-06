@@ -152,8 +152,14 @@ app.post("/api/post", authed(async (req, res, session) => {
 }));
 
 app.get("/qodex-auth.js", (req, res) => {
-  res.type("application/javascript").send(`
+  res.type("application/javascript").set("cache-control", "no-store").send(qodexAuthScript());
+});
+
+function qodexAuthScript() {
+  return `
 (() => {
+  if (window.__qodexInjected) return;
+  window.__qodexInjected = true;
   navigator.serviceWorker?.getRegistrations?.().then(rs => rs.forEach(r => r.unregister()));
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
@@ -212,8 +218,8 @@ app.get("/qodex-auth.js", (req, res) => {
   go();
   setInterval(go, 1000);
 })();
-`);
-});
+`;
+}
 
 app.get(["/sw.js", "/service-worker.js"], (req, res) => {
   res.type("application/javascript").set("cache-control", "no-store").send("");
@@ -418,6 +424,12 @@ async function proxyTraqFrontend(req, res) {
     headers: { accept: req.headers.accept || "*/*" },
   });
   const type = upstream.headers.get("content-type") || "";
+  if (type.includes("javascript") && req.path.startsWith("/assets/")) {
+    res.status(upstream.status).type("application/javascript").set("cache-control", "no-store").send(
+      `${qodexAuthScript()}\n${await upstream.text()}`
+    );
+    return;
+  }
   if (!type.includes("text/html")) return pipeFetchResponse(upstream, res);
 
   res.status(upstream.status).type("html").set("cache-control", "no-store").send(
